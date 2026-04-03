@@ -1,4 +1,9 @@
-use crate::config::Config;
+use std::io::Write;
+
+use eframe::egui::{self, RichText};
+
+use crate::config::{CacheConfig, Config};
+
 use super::app::DohProxyApp;
 
 pub struct ConfigPanel {
@@ -18,7 +23,135 @@ impl ConfigPanel {
         }
     }
 
-    pub fn show(_app: &mut DohProxyApp, ui: &mut eframe::egui::Ui) {
-        ui.label("Config — coming soon");
+    pub fn show(app: &mut DohProxyApp, ui: &mut egui::Ui) {
+        if app.is_running() {
+            ui.add_space(8.0);
+            ui.label(
+                RichText::new("⚠  Stop the server before editing config.")
+                    .color(egui::Color32::from_rgb(255, 200, 0)),
+            );
+            ui.add_space(8.0);
+        }
+
+        ui.add_space(8.0);
+        let enabled = !app.is_running();
+
+        // Listen address
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Listen Address:").strong());
+            ui.add_enabled(
+                enabled,
+                egui::TextEdit::singleline(&mut app.config_panel.listen_addr)
+                    .desired_width(200.0),
+            );
+        });
+
+        ui.add_space(8.0);
+
+        // Upstream URLs
+        ui.label(RichText::new("Upstream URLs:").strong());
+        let mut to_remove: Option<usize> = None;
+        let upstream_count = app.config_panel.upstreams.len();
+        for i in 0..upstream_count {
+            ui.horizontal(|ui| {
+                ui.add_enabled(
+                    enabled,
+                    egui::TextEdit::singleline(&mut app.config_panel.upstreams[i])
+                        .desired_width(360.0),
+                );
+                if enabled && ui.small_button("✕").clicked() {
+                    to_remove = Some(i);
+                }
+            });
+        }
+        if let Some(idx) = to_remove {
+            app.config_panel.upstreams.remove(idx);
+        }
+        if enabled && ui.small_button("+ Add upstream").clicked() {
+            app.config_panel.upstreams.push("https://".into());
+        }
+
+        ui.add_space(8.0);
+
+        // Cache settings
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Cache:").strong());
+            ui.add_enabled(
+                enabled,
+                egui::Checkbox::new(&mut app.config_panel.cache_enabled, "Enabled"),
+            );
+            ui.add_space(16.0);
+            ui.label("Capacity:");
+            ui.add_enabled(
+                enabled,
+                egui::TextEdit::singleline(&mut app.config_panel.cache_capacity)
+                    .desired_width(80.0),
+            );
+        });
+
+        ui.add_space(16.0);
+
+        // Save button
+        if enabled && ui.button(RichText::new("💾  Save Config").size(14.0)).clicked() {
+            match Self::apply_and_save(app) {
+                Ok(()) => {
+                    app.status_message = Some("Config saved.".into());
+                }
+                Err(e) => {
+                    app.status_message = Some(format!("Save failed: {e}"));
+                }
+            }
+        }
+    }
+
+    fn apply_and_save(app: &mut DohProxyApp) -> anyhow::Result<()> {
+        let listen_addr = app
+            .config_panel
+            .listen_addr
+            .parse()
+            .map_err(|e| anyhow::anyhow!("invalid listen address: {e}"))?;
+
+        let capacity: u64 = app
+            .config_panel
+            .cache_capacity
+            .trim()
+            .parse()
+            .map_err(|e| anyhow::anyhow!("invalid cache capacity: {e}"))?;
+
+        let upstreams: Vec<String> = app
+            .config_panel
+            .upstreams
+            .iter()
+            .filter(|u| !u.trim().is_empty())
+            .cloned()
+            .collect();
+
+        if upstreams.is_empty() {
+            return Err(anyhow::anyhow!("at least one upstream URL is required"));
+        }
+
+        // Build TOML — keep it human-readable
+        let toml = format!(
+            "listen_addr = \"{listen_addr}\"\n\nupstreams = [\n{upstream_lines}]\n\n[cache]\nenabled = {cache_enabled}\ncapacity = {capacity}\n",
+            upstream_lines = upstreams
+                .iter()
+                .map(|u| format!("    \"{u}\",\n"))
+                .collect::<String>(),
+            cache_enabled = app.config_panel.cache_enabled,
+        );
+
+        let mut f = std::fs::File::create(&app.config_path)
+            .map_err(|e| anyhow::anyhow!("cannot write config: {e}"))?;
+        f.write_all(toml.as_bytes())?;
+
+        // Update live config
+        app.config.listen_addr = listen_addr;
+        app.config.upstreams = upstreams;
+        app.config.cache = CacheConfig {
+            enabled: app.config_panel.cache_enabled,
+            capacity,
+        };
+
+        Ok(())
     }
 }
