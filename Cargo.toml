@@ -7,6 +7,10 @@ edition = "2021"
 name = "doh-proxy"
 path = "src/main.rs"
 
+[[bin]]
+name = "doh-proxy-gui"
+path = "src/gui_main.rs"
+
 [lib]
 name = "doh_proxy"
 path = "src/lib.rs"
@@ -25,6 +29,8 @@ anyhow = "1"
 hickory-proto = "0.25"
 moka = { version = "0.12", features = ["future"] }
 base64 = "0.22"
+eframe = { version = "0.34", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+egui = "0.34"
 
 [dev-dependencies]
 tokio-test = "0.4"
