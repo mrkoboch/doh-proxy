@@ -89,11 +89,13 @@ impl DohProxyApp {
     }
 
     pub fn stop_server(&mut self) {
-        // MUST set flag before overwriting server_state to avoid Arc drop race
-        if let ServerState::Running { ref stop_flag, .. } = self.server_state {
-            stop_flag.store(true, Ordering::Relaxed);
+        let old_state = std::mem::replace(&mut self.server_state, ServerState::Stopped);
+        if let ServerState::Running { stop_flag, _thread } = old_state {
+            stop_flag.store(true, Ordering::Release);
+            if let Err(e) = _thread.join() {
+                tracing::error!("server thread panicked: {:?}", e);
+            }
         }
-        self.server_state = ServerState::Stopped;
         self.status_message = Some("Server stopped.".into());
     }
 }

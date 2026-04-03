@@ -43,8 +43,8 @@ impl Server {
         let mut consecutive_errors: u32 = 0;
 
         loop {
-            if stop.load(Ordering::Relaxed) {
-                // Relaxed: no other shared state is guarded by this flag
+            if stop.load(Ordering::Acquire) {
+                // Acquire: pairs with Release store in stop_server() for cross-thread visibility
                 info!("stop signal received, shutting down");
                 break;
             }
