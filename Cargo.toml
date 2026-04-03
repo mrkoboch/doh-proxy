@@ -1,0 +1,30 @@
+[package]
+name = "doh-proxy"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "doh-proxy"
+path = "src/main.rs"
+
+[lib]
+name = "doh_proxy"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2"
+anyhow = "1"
+hickory-proto = "0.25"
+moka = { version = "0.12", features = ["future"] }
+base64 = "0.22"
+
+[dev-dependencies]
+tokio-test = "0.4"
