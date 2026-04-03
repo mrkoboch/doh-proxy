@@ -21,6 +21,6 @@ async fn main() -> anyhow::Result<()> {
 
     info!(listen = %config.listen_addr, "starting DoH proxy");
 
-    let server = Server::new(config).await?;
+    let server = Server::new(config, None).await?;
     server.run().await
 }
