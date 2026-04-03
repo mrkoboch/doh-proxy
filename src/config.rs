@@ -66,3 +66,13 @@ impl Config {
             .map_err(|e| ProxyError::Config(e.to_string()))
     }
 }
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            listen_addr: default_listen_addr(),
+            upstreams: default_upstreams(),
+            cache: CacheConfig::default(),
+        }
+    }
+}
