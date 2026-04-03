@@ -76,7 +76,7 @@ impl eframe::App for DohProxyApp {
         ui.separator();
 
         // Status bar at bottom (render before tab content so layout is stable)
-        if let Some(ref msg) = self.status_message.clone() {
+        if let Some(ref msg) = self.status_message {
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.small(msg);
             });
