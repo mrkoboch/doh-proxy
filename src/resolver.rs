@@ -29,10 +29,15 @@ impl Resolver {
 
     pub async fn resolve(&self, raw_query: &[u8]) -> Result<Bytes> {
         let start = Instant::now();
-        let msg = Message::from_bytes(raw_query).map_err(ProxyError::DnsParse)?;
+        let msg = match Message::from_bytes(raw_query) {
+            Ok(m) => m,
+            Err(e) => {
+                self.record_stat("<parse-error>".into(), "?".into(), QueryStatus::Error, start);
+                return Err(ProxyError::DnsParse(e));
+            }
+        };
 
-        let (query_name, query_type_str) = query_info(&msg);
-        let cache_key = cache_key_for(&msg);
+        let (query_name, query_type_str, cache_key) = extract_query_parts(&msg);
 
         if let Some(ref cache) = self.cache {
             if let Some(cached) = cache.get(&cache_key).await {
@@ -71,21 +76,14 @@ impl Resolver {
     }
 }
 
-fn query_info(msg: &Message) -> (String, String) {
+fn extract_query_parts(msg: &Message) -> (String, String, CacheKey) {
     if let Some(q) = msg.queries().first() {
         let name = q.name().to_lowercase().to_string();
-        let qtype = format!("{}", RecordType::from(q.query_type()));
-        (name, qtype)
+        let qtype_u16: u16 = q.query_type().into();
+        let qtype_str = format!("{}", RecordType::from(q.query_type()));
+        (name.clone(), qtype_str, (name, qtype_u16))
     } else {
-        (String::new(), "?".into())
-    }
-}
-
-fn cache_key_for(msg: &Message) -> CacheKey {
-    if let Some(q) = msg.queries().first() {
-        (q.name().to_lowercase().to_string(), q.query_type().into())
-    } else {
-        (String::new(), 0)
+        (String::new(), "?".into(), (String::new(), 0))
     }
 }
 
