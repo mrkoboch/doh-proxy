@@ -1,7 +1,7 @@
 // src/stats.rs
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::SystemTime;
 
 pub const LOG_CAPACITY: usize = 200;
@@ -33,22 +33,22 @@ impl std::fmt::Display for QueryStatus {
 }
 
 pub struct Stats {
-    pub total_queries: AtomicU64,
-    pub cache_hits:    AtomicU64,
-    pub upstream_queries: AtomicU64,
-    pub errors:        AtomicU64,
+    total_queries: AtomicU64,
+    cache_hits:    AtomicU64,
+    upstream_queries: AtomicU64,
+    errors:        AtomicU64,
     log: Mutex<VecDeque<LogEntry>>,
 }
 
 impl Stats {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new() -> Self {
+        Self {
             total_queries:    AtomicU64::new(0),
             cache_hits:       AtomicU64::new(0),
             upstream_queries: AtomicU64::new(0),
             errors:           AtomicU64::new(0),
             log: Mutex::new(VecDeque::with_capacity(LOG_CAPACITY)),
-        })
+        }
     }
 
     pub fn record(&self, entry: LogEntry) {
