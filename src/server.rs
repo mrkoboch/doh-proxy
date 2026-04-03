@@ -38,9 +38,13 @@ impl Server {
         let socket = Arc::new(UdpSocket::bind(self.config.listen_addr).await?);
         info!(addr = %self.config.listen_addr, "UDP listener ready");
 
-        let mut buf = vec![0u8; 4096];
+        let mut buf = vec![0u8; 4096]; // reused across iterations; data is copied into query before each spawn
+        let mut tasks = tokio::task::JoinSet::new();
+        let mut consecutive_errors: u32 = 0;
+
         loop {
             if stop.load(Ordering::Relaxed) {
+                // Relaxed: no other shared state is guarded by this flag
                 info!("stop signal received, shutting down");
                 break;
             }
@@ -51,10 +55,11 @@ impl Server {
             .await
             {
                 Ok(Ok((len, peer))) => {
+                    consecutive_errors = 0;
                     let query = buf[..len].to_vec();
                     let proxy = Arc::clone(&self.proxy);
                     let socket = Arc::clone(&socket);
-                    tokio::spawn(async move {
+                    tasks.spawn(async move {
                         let response = proxy.handle(&query).await;
                         if let Err(e) = socket.send_to(&response, peer).await {
                             error!(peer = %peer, error = %e, "failed to send response");
@@ -62,9 +67,23 @@ impl Server {
                     });
                 }
                 Ok(Err(e)) => {
-                    error!(error = %e, "recv_from error");
+                    consecutive_errors += 1;
+                    error!(error = %e, consecutive = consecutive_errors, "recv_from error");
+                    if consecutive_errors >= 5 {
+                        error!("too many consecutive recv_from errors, stopping server");
+                        break;
+                    }
                 }
                 Err(_) => {} // timeout — loop back and check stop flag
+            }
+            // Reap any completed tasks to avoid unbounded JoinSet growth
+            while tasks.try_join_next().is_some() {}
+        }
+
+        // Drain in-flight tasks before returning
+        while let Some(res) = tasks.join_next().await {
+            if let Err(e) = res {
+                error!(error = ?e, "task panicked during shutdown drain");
             }
         }
         Ok(())
