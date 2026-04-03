@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use eframe::egui;
@@ -57,6 +57,44 @@ impl DohProxyApp {
 
     pub fn is_running(&self) -> bool {
         matches!(self.server_state, ServerState::Running { .. })
+    }
+
+    pub fn start_server(&mut self) {
+        if self.is_running() {
+            return;
+        }
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let config = self.config.clone();
+        let stats = Arc::clone(&self.stats);
+        let stop_clone = Arc::clone(&stop_flag);
+
+        let thread = std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+            rt.block_on(async move {
+                match crate::server::Server::new(config, Some(stats)).await {
+                    Ok(server) => {
+                        if let Err(e) = server.run_cancellable(stop_clone).await {
+                            tracing::error!("server error: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("server init error: {}", e);
+                    }
+                }
+            });
+        });
+
+        self.server_state = ServerState::Running { stop_flag, _thread: thread };
+        self.status_message = Some(format!("Server started on {}", self.config.listen_addr));
+    }
+
+    pub fn stop_server(&mut self) {
+        // MUST set flag before overwriting server_state to avoid Arc drop race
+        if let ServerState::Running { ref stop_flag, .. } = self.server_state {
+            stop_flag.store(true, Ordering::Relaxed);
+        }
+        self.server_state = ServerState::Stopped;
+        self.status_message = Some("Server stopped.".into());
     }
 }
 
