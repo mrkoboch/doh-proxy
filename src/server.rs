@@ -24,7 +24,7 @@ impl Server {
         } else {
             None
         };
-        let resolver = Resolver::new(upstream, cache);
+        let resolver = Resolver::new(upstream, cache, None);
         let proxy = Arc::new(Proxy::new(resolver));
         Ok(Self { proxy, config })
     }
