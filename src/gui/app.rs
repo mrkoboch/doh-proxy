@@ -1,3 +1,5 @@
+use eframe::egui;
+
 pub struct DohProxyApp;
 
 impl DohProxyApp {
