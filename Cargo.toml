@@ -1,23 +1,19 @@
+[workspace]
+members = [".", "gui/src-tauri"]
+resolver = "2"
+
 [package]
 name = "doh-proxy"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "doh-proxy"
-path = "src/main.rs"
-
-[[bin]]
-name = "doh-proxy-gui"
-path = "src/gui_main.rs"
-required-features = ["gui"]
-
 [lib]
 name = "doh_proxy"
 path = "src/lib.rs"
 
-[features]
-gui = ["dep:eframe"]
+[[bin]]
+name = "doh-proxy"
+path = "src/main.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -33,10 +29,6 @@ anyhow = "1"
 hickory-proto = "0.25"
 moka = { version = "0.12", features = ["future"] }
 base64 = "0.22"
-eframe = { version = "0.34", default-features = false, features = ["default_fonts", "glow"], optional = true }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-eframe = { version = "0.34", features = ["x11", "wayland"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

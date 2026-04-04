@@ -1,10 +1,10 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::Path;
 
 use crate::error::{ProxyError, Result};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// Address to listen for incoming DNS queries (UDP + TCP)
     #[serde(default = "default_listen_addr")]
@@ -19,7 +19,7 @@ pub struct Config {
     pub cache: CacheConfig,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CacheConfig {
     /// Maximum number of cached entries
     #[serde(default = "default_cache_capacity")]

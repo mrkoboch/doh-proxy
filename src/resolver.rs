@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 
 use bytes::Bytes;
 use hickory_proto::{
@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     cache::{CacheKey, DnsCache},
     error::{ProxyError, Result},
-    stats::{LogEntry, QueryStatus, Stats},
+    stats::{unix_now, LogEntry, QueryStatus, Stats},
     upstream::UpstreamClient,
 };
 
@@ -66,7 +66,7 @@ impl Resolver {
     fn record_stat(&self, name: String, qtype: String, status: QueryStatus, start: Instant) {
         if let Some(ref stats) = self.stats {
             stats.record(LogEntry {
-                timestamp: SystemTime::now(),
+                timestamp_unix: unix_now(),
                 query_name: name,
                 query_type: qtype,
                 status,

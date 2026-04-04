@@ -1,21 +1,22 @@
-// src/stats.rs
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::Serialize;
 
 pub const LOG_CAPACITY: usize = 200;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LogEntry {
-    pub timestamp: SystemTime,
+    pub timestamp_unix: u64,
     pub query_name: String,
     pub query_type: String,
     pub status: QueryStatus,
     pub latency_ms: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum QueryStatus {
     CacheHit,
     Upstream,
@@ -32,12 +33,27 @@ impl std::fmt::Display for QueryStatus {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct StatsSnapshot {
+    pub total: u64,
+    pub cache_hits: u64,
+    pub upstream: u64,
+    pub errors: u64,
+}
+
 pub struct Stats {
-    total_queries: AtomicU64,
-    cache_hits:    AtomicU64,
+    total_queries:    AtomicU64,
+    cache_hits:       AtomicU64,
     upstream_queries: AtomicU64,
-    errors:        AtomicU64,
+    errors:           AtomicU64,
     log: Mutex<VecDeque<LogEntry>>,
+}
+
+pub fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 impl Stats {
@@ -65,10 +81,19 @@ impl Stats {
         log.push_back(entry);
     }
 
-    pub fn total(&self)    -> u64 { self.total_queries.load(Ordering::Relaxed) }
+    pub fn total(&self)      -> u64 { self.total_queries.load(Ordering::Relaxed) }
     pub fn cache_hits(&self) -> u64 { self.cache_hits.load(Ordering::Relaxed) }
-    pub fn upstream(&self) -> u64 { self.upstream_queries.load(Ordering::Relaxed) }
-    pub fn errors(&self)   -> u64 { self.errors.load(Ordering::Relaxed) }
+    pub fn upstream(&self)   -> u64 { self.upstream_queries.load(Ordering::Relaxed) }
+    pub fn errors(&self)     -> u64 { self.errors.load(Ordering::Relaxed) }
+
+    pub fn snapshot(&self) -> StatsSnapshot {
+        StatsSnapshot {
+            total:      self.total(),
+            cache_hits: self.cache_hits(),
+            upstream:   self.upstream(),
+            errors:     self.errors(),
+        }
+    }
 
     pub fn snapshot_log(&self) -> Vec<LogEntry> {
         self.log.lock().unwrap().iter().rev().cloned().collect()
@@ -79,30 +104,20 @@ impl Stats {
 mod tests {
     use super::*;
 
+    fn make_entry(status: QueryStatus) -> LogEntry {
+        LogEntry { timestamp_unix: 0, query_name: "a.com".into(), query_type: "A".into(), status, latency_ms: 1 }
+    }
+
+    fn make_entry_named(name: &str, status: QueryStatus) -> LogEntry {
+        LogEntry { timestamp_unix: 0, query_name: name.into(), query_type: "A".into(), status, latency_ms: 0 }
+    }
+
     #[test]
     fn counters_increment_correctly() {
         let s = Stats::new();
-        s.record(LogEntry {
-            timestamp: SystemTime::now(),
-            query_name: "example.com".into(),
-            query_type: "A".into(),
-            status: QueryStatus::CacheHit,
-            latency_ms: 0,
-        });
-        s.record(LogEntry {
-            timestamp: SystemTime::now(),
-            query_name: "foo.com".into(),
-            query_type: "AAAA".into(),
-            status: QueryStatus::Upstream,
-            latency_ms: 12,
-        });
-        s.record(LogEntry {
-            timestamp: SystemTime::now(),
-            query_name: "bad.com".into(),
-            query_type: "A".into(),
-            status: QueryStatus::Error,
-            latency_ms: 5,
-        });
+        s.record(make_entry(QueryStatus::CacheHit));
+        s.record(make_entry(QueryStatus::Upstream));
+        s.record(make_entry(QueryStatus::Error));
         assert_eq!(s.total(), 3);
         assert_eq!(s.cache_hits(), 1);
         assert_eq!(s.upstream(), 1);
@@ -114,7 +129,7 @@ mod tests {
         let s = Stats::new();
         for i in 0..=LOG_CAPACITY {
             s.record(LogEntry {
-                timestamp: SystemTime::now(),
+                timestamp_unix: i as u64,
                 query_name: format!("{i}.com"),
                 query_type: "A".into(),
                 status: QueryStatus::Upstream,
@@ -128,16 +143,22 @@ mod tests {
     fn snapshot_log_newest_first() {
         let s = Stats::new();
         for name in ["first.com", "second.com", "third.com"] {
-            s.record(LogEntry {
-                timestamp: SystemTime::now(),
-                query_name: name.into(),
-                query_type: "A".into(),
-                status: QueryStatus::Upstream,
-                latency_ms: 0,
-            });
+            s.record(make_entry_named(name, QueryStatus::Upstream));
         }
         let log = s.snapshot_log();
         assert_eq!(log[0].query_name, "third.com");
         assert_eq!(log[2].query_name, "first.com");
+    }
+
+    #[test]
+    fn snapshot_returns_correct_counts() {
+        let s = Stats::new();
+        s.record(make_entry(QueryStatus::CacheHit));
+        s.record(make_entry(QueryStatus::CacheHit));
+        s.record(make_entry(QueryStatus::Error));
+        let snap = s.snapshot();
+        assert_eq!(snap.total, 3);
+        assert_eq!(snap.cache_hits, 2);
+        assert_eq!(snap.errors, 1);
     }
 }
