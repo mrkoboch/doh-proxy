@@ -33,7 +33,7 @@ impl std::fmt::Display for QueryStatus {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StatsSnapshot {
     pub total: u64,
     pub cache_hits: u64,
