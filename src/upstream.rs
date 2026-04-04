@@ -16,6 +16,7 @@ impl UpstreamClient {
     pub fn new(urls: Vec<String>) -> Result<Self> {
         let client = Client::builder()
             .use_rustls_tls()
+            .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(ProxyError::Upstream)?;
         Ok(Self { client, urls })

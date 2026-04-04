@@ -130,4 +130,8 @@ impl eframe::App for DohProxyApp {
             Tab::QueryLog  => LogPanel::show(self, ui),
         }
     }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.stop_server();
+    }
 }
