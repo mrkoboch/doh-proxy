@@ -105,7 +105,7 @@ impl ConfigPanel {
     }
 
     fn apply_and_save(app: &mut DohProxyApp) -> anyhow::Result<()> {
-        let listen_addr = app
+        let listen_addr: std::net::SocketAddr = app
             .config_panel
             .listen_addr
             .parse()
@@ -130,22 +130,36 @@ impl ConfigPanel {
             return Err(anyhow::anyhow!("at least one upstream URL is required"));
         }
 
-        // Build TOML — keep it human-readable
+        for url in &upstreams {
+            if !url.starts_with("https://") && !url.starts_with("http://") {
+                return Err(anyhow::anyhow!(
+                    "invalid upstream URL (must start with https:// or http://): {url}"
+                ));
+            }
+        }
+
+        // Build TOML — keep it human-readable, escape strings to prevent injection
         let toml = format!(
-            "listen_addr = \"{listen_addr}\"\n\nupstreams = [\n{upstream_lines}]\n\n[cache]\nenabled = {cache_enabled}\ncapacity = {capacity}\n",
-            upstream_lines = upstreams
-                .iter()
-                .map(|u| format!("    \"{u}\",\n"))
-                .collect::<String>(),
-            cache_enabled = app.config_panel.cache_enabled,
+            "listen_addr = \"{}\"\n\nupstreams = [\n{}]\n\n[cache]\nenabled = {}\ncapacity = {}\n",
+            toml_escape(&listen_addr.to_string()),
+            upstreams.iter().map(|u| format!("    \"{}\",\n", toml_escape(u))).collect::<String>(),
+            app.config_panel.cache_enabled,
+            capacity,
         );
 
-        let mut f = std::fs::File::create(&app.config_path)
-            .map_err(|e| anyhow::anyhow!("cannot write config: {e}"))?;
-        f.write_all(toml.as_bytes())?;
+        let tmp_path = format!("{}.tmp", app.config_path);
+        {
+            let mut f = std::fs::File::create(&tmp_path)
+                .map_err(|e| anyhow::anyhow!("cannot write config: {e}"))?;
+            f.write_all(toml.as_bytes())
+                .map_err(|e| anyhow::anyhow!("cannot write config: {e}"))?;
+        }
+        std::fs::rename(&tmp_path, &app.config_path)
+            .map_err(|e| anyhow::anyhow!("cannot replace config file: {e}"))?;
 
         // Update live config
         app.config.listen_addr = listen_addr;
+        app.config_panel.listen_addr = app.config.listen_addr.to_string();
         app.config.upstreams = upstreams;
         app.config.cache = CacheConfig {
             enabled: app.config_panel.cache_enabled,
@@ -154,4 +168,8 @@ impl ConfigPanel {
 
         Ok(())
     }
+}
+
+fn toml_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
