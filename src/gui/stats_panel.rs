@@ -17,9 +17,13 @@ impl StatsPanel {
         let ups   = app.stats.upstream();
         let errs  = app.stats.errors();
 
-        let hit_pct = if total > 0 { hits * 100 / total } else { 0 };
-        let ups_pct = if total > 0 { ups  * 100 / total } else { 0 };
-        let err_pct = if total > 0 { errs * 100 / total } else { 0 };
+        let pct = |n: u64, d: u64| -> u64 {
+            if d == 0 { 0 } else { ((n as f64 / d as f64) * 100.0) as u64 }
+        };
+
+        let hit_pct = pct(hits, total).min(100);
+        let ups_pct = pct(ups,  total).min(100);
+        let err_pct = pct(errs, total).min(100);
 
         egui::Grid::new("stats_grid")
             .num_columns(3)
@@ -67,7 +71,7 @@ impl StatsPanel {
         ui.add_space(16.0);
 
         if total > 0 {
-            let filled = (hit_pct as usize).min(50);
+            let filled = (hit_pct as usize * 50 / 100).min(50);
             let bar: String = "█".repeat(filled) + &"░".repeat(50 - filled);
             ui.label(
                 RichText::new(format!("Cache hit rate: {bar} {hit_pct}%"))
