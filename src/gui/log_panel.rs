@@ -30,13 +30,14 @@ impl LogPanel {
 
         // Header row
         egui::Grid::new("log_header")
-            .num_columns(4)
+            .num_columns(5)
             .min_col_width(80.0)
             .show(ui, |ui| {
                 ui.label(RichText::new("Time").strong());
                 ui.label(RichText::new("Query Name").strong());
                 ui.label(RichText::new("Type").strong());
                 ui.label(RichText::new("Status").strong());
+                ui.label(RichText::new("Latency").strong());
                 ui.end_row();
             });
 
@@ -46,7 +47,7 @@ impl LogPanel {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 egui::Grid::new("log_entries")
-                    .num_columns(4)
+                    .num_columns(5)
                     .min_col_width(80.0)
                     .striped(true)
                     .spacing([8.0, 4.0])
@@ -69,6 +70,7 @@ impl LogPanel {
                                 }
                             };
                             ui.label(RichText::new(label).small().color(color));
+                            ui.label(RichText::new(format!("{}ms", entry.latency_ms)).monospace().small());
                             ui.end_row();
                         }
                     });
@@ -81,5 +83,5 @@ fn format_time(t: SystemTime) -> String {
     let h = (secs % 86400) / 3600;
     let m = (secs % 3600) / 60;
     let s = secs % 60;
-    format!("{h:02}:{m:02}:{s:02}")
+    format!("{h:02}:{m:02}:{s:02} UTC")
 }
