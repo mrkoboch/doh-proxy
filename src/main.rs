@@ -1,26 +1,64 @@
-use clap::Parser;
-use doh_proxy::{config::Config, server::Server};
-use tracing::info;
+mod cli;
 
+use clap::{Parser, Subcommand};
+
+/// A DNS-over-HTTPS proxy with a polished terminal interface.
 #[derive(Parser)]
-#[command(name = "doh-proxy", about = "A DNS-over-HTTPS proxy server")]
+#[command(
+    name = "doh-proxy",
+    version,
+    about,
+    long_about = "doh-proxy forwards DNS queries to upstream DoH resolvers.\n\
+                  Config is stored at ~/.config/doh-proxy/config.toml.\n\
+                  Run `doh-proxy config` to set up interactively."
+)]
 struct Cli {
-    /// Path to config file
-    #[arg(short, long, default_value = "config/default.toml")]
-    config: String,
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Start the DoH proxy (runs in the foreground; Ctrl+C or `stop` to quit)
+    Start {
+        /// Override the listen address (e.g. 0.0.0.0:53)
+        #[arg(short, long, value_name = "ADDR")]
+        listen: Option<String>,
+
+        /// Override upstream DoH resolvers (can be repeated)
+        #[arg(short, long = "upstream", value_name = "URL")]
+        upstreams: Vec<String>,
+    },
+
+    /// Interactive configuration setup
+    Config,
+
+    /// Show proxy status and statistics
+    Status,
+
+    /// Tail live proxy logs (Ctrl+C to quit)
+    Logs {
+        /// Number of historical lines to show on start
+        #[arg(short = 'n', long, default_value = "20")]
+        lines: usize,
+
+        /// Keep following new log lines (like tail -f)
+        #[arg(short, long, default_value = "true")]
+        follow: bool,
+    },
+
+    /// Gracefully stop a running proxy
+    Stop,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
     let cli = Cli::parse();
-    let config = Config::from_file(&cli.config)?;
-
-    info!(listen = %config.listen_addr, "starting DoH proxy");
-
-    let server = Server::new(config, None).await?;
-    server.run().await
+    match cli.command {
+        Commands::Start { listen, upstreams } => cli::start::run(listen, upstreams).await,
+        Commands::Config => cli::config_cmd::run(),
+        Commands::Status => cli::status::run(),
+        Commands::Logs { lines, follow } => cli::logs::run(follow, lines),
+        Commands::Stop => cli::stop::run(),
+    }
 }
