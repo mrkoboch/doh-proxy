@@ -72,7 +72,7 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
     let spinner = ProgressBar::new_spinner();
     spinner.set_style(
         ProgressStyle::with_template("{spinner:.cyan} {msg}")
-            .unwrap()
+            .map_err(|e| anyhow::anyhow!("spinner template error: {e}"))?
             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
     );
     spinner.set_message("Starting proxy...");
@@ -106,12 +106,12 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
         style("Upstreams:").dim(),
         config.upstreams.join(", "),
         style("Log:").dim(),
-        runtime::log_path().display()
+        log_path.display()
     );
     println!("{}", style("  Press Ctrl+C or run `doh-proxy stop` to quit.").dim());
 
     // Spawn stats writer task
-    {
+    let stats_handle = {
         let stats = Arc::clone(&stats);
         let stop = Arc::clone(&stop_flag);
         let listen_addr = config.listen_addr.to_string();
@@ -119,7 +119,7 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             loop {
                 interval.tick().await;
-                if stop.load(Ordering::Relaxed) {
+                if stop.load(Ordering::Acquire) {
                     break;
                 }
                 let rs = RuntimeStats {
@@ -129,13 +129,12 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
                 };
                 runtime::write_runtime_stats(&rs).ok();
             }
-        });
-    }
+        })
+    };
 
     // Spawn server on a background thread (it needs its own Tokio runtime)
-    let stop_server = Arc::clone(&stop_flag);
     let server_thread = {
-        let stop = Arc::clone(&stop_server);
+        let stop = Arc::clone(&stop_flag);
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
             rt.block_on(async move {
@@ -162,8 +161,7 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
     println!("\n{} Shutting down...", style("◼").yellow());
     stop_flag.store(true, Ordering::Release);
     let _ = server_thread.join();
-
-    // Clean up runtime files
+    let _ = stats_handle.await;   // flush final stats snapshot
     runtime::clear_pid().ok();
     println!("{} Stopped.", style("●").dim());
 
