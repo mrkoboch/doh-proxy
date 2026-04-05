@@ -74,7 +74,7 @@ jobs:
         run: |
           STAGING="staging/doh-proxy-gui"
           mkdir -p "$STAGING/config"
-          cp gui/src-tauri/target/${{ matrix.target }}/release/${{ matrix.binary }} "$STAGING/"
+          cp target/${{ matrix.target }}/release/${{ matrix.binary }} "$STAGING/"
           cp config/default.toml "$STAGING/config/"
           cp README.md "$STAGING/"
 
