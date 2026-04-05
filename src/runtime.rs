@@ -90,7 +90,9 @@ pub(crate) fn clear_pid_in(dir: &Path) -> anyhow::Result<()> {
 pub(crate) fn write_runtime_stats_to(dir: &Path, rs: &RuntimeStats) -> anyhow::Result<()> {
     ensure_dir(dir)?;
     let json = serde_json::to_string(rs)?;
-    std::fs::write(stats_path(dir), json)?;
+    let tmp = stats_path(dir).with_extension("json.tmp");
+    std::fs::write(&tmp, &json)?;
+    std::fs::rename(&tmp, stats_path(dir))?;
     Ok(())
 }
 
@@ -100,7 +102,10 @@ pub(crate) fn read_runtime_stats_from(dir: &Path) -> anyhow::Result<Option<Runti
         return Ok(None);
     }
     let content = std::fs::read_to_string(path)?;
-    let rs: RuntimeStats = serde_json::from_str(&content)?;
+    let rs: RuntimeStats = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return Ok(None),
+    };
     Ok(Some(rs))
 }
 
@@ -110,15 +115,16 @@ mod tests {
     use crate::stats::StatsSnapshot;
     use std::fs;
 
-    fn tmp_dir() -> PathBuf {
-        let d = std::env::temp_dir().join(format!("doh_proxy_runtime_{}", std::process::id()));
+    fn tmp_dir(label: &str) -> PathBuf {
+        let d = std::env::temp_dir()
+            .join(format!("doh_proxy_runtime_{}_{}", std::process::id(), label));
         fs::create_dir_all(&d).unwrap();
         d
     }
 
     #[test]
     fn write_and_read_pid() {
-        let dir = tmp_dir();
+        let dir = tmp_dir("write_and_read_pid");
         write_pid_to(&dir, 12345).unwrap();
         let pid = read_pid_from(&dir).unwrap();
         assert_eq!(pid, Some(12345));
@@ -127,7 +133,7 @@ mod tests {
 
     #[test]
     fn clear_pid() {
-        let dir = tmp_dir();
+        let dir = tmp_dir("clear_pid");
         write_pid_to(&dir, 99).unwrap();
         clear_pid_in(&dir).unwrap();
         assert_eq!(read_pid_from(&dir).unwrap(), None);
@@ -136,14 +142,14 @@ mod tests {
 
     #[test]
     fn read_pid_when_file_absent_returns_none() {
-        let dir = tmp_dir();
+        let dir = tmp_dir("read_pid_absent");
         assert_eq!(read_pid_from(&dir).unwrap(), None);
         fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
     fn write_and_read_stats() {
-        let dir = tmp_dir();
+        let dir = tmp_dir("write_and_read_stats");
         let rs = RuntimeStats {
             snapshot: StatsSnapshot { total: 10, cache_hits: 3, upstream: 6, errors: 1 },
             listen_addr: "0.0.0.0:5353".into(),
@@ -159,7 +165,7 @@ mod tests {
 
     #[test]
     fn read_stats_when_absent_returns_none() {
-        let dir = tmp_dir();
+        let dir = tmp_dir("read_stats_absent");
         assert!(read_runtime_stats_from(&dir).unwrap().is_none());
         fs::remove_dir_all(&dir).unwrap();
     }
