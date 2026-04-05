@@ -16,6 +16,10 @@ path = "src/lib.rs"
 name = "doh-proxy"
 path = "src/main.rs"
 
+[[bin]]
+name = "doh-proxy-tui"
+path = "src/tui_main.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
@@ -30,6 +34,8 @@ anyhow = "1"
 hickory-proto = "0.25"
 moka = { version = "0.12", features = ["future"] }
 base64 = "0.22"
+ratatui = "0.29"
+crossterm = "0.28"
 
 [dev-dependencies]
 tokio-test = "0.4"
