@@ -60,13 +60,16 @@ fn bool_true() -> bool {
 }
 
 /// Returns `~/.config/doh-proxy/config.toml` (XDG on Linux, standard locations on macOS/Windows).
+/// Falls back to `$HOME/.config/doh-proxy/config.toml` (or `./.config/…`) when XDG lookup fails.
 pub fn config_path() -> PathBuf {
-    project_dirs().config_dir().join("config.toml")
-}
-
-fn project_dirs() -> ProjectDirs {
     ProjectDirs::from("", "", "doh-proxy")
-        .expect("could not determine home directory")
+        .map(|d| d.config_dir().join("config.toml"))
+        .unwrap_or_else(|| {
+            std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".config/doh-proxy/config.toml")
+        })
 }
 
 impl Config {
@@ -79,26 +82,32 @@ impl Config {
     /// Load from the XDG config path. If the file does not exist, create it with defaults.
     pub fn load_or_create() -> Result<Self> {
         let path = config_path();
-        if path.exists() {
-            return Self::from_file(&path);
+        match std::fs::read_to_string(&path) {
+            Ok(contents) => toml::from_str(&contents).map_err(|e| ProxyError::Config(e.to_string())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let config = Self::default();
+                config.save()?;
+                Ok(config)
+            }
+            Err(e) => Err(ProxyError::Config(e.to_string())),
         }
-        let config = Self::default();
-        config.save()?;
-        Ok(config)
     }
 
-    /// Write config to the XDG config path, creating parent directories as needed.
-    pub fn save(&self) -> Result<()> {
-        let path = config_path();
+    fn save_to(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| ProxyError::Config(e.to_string()))?;
         }
         let contents = toml::to_string_pretty(self)
             .map_err(|e| ProxyError::Config(e.to_string()))?;
-        std::fs::write(&path, contents)
+        std::fs::write(path, contents)
             .map_err(|e| ProxyError::Config(e.to_string()))?;
         Ok(())
+    }
+
+    /// Write config to the XDG config path, creating parent directories as needed.
+    pub fn save(&self) -> Result<()> {
+        self.save_to(&config_path())
     }
 }
 
@@ -135,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn save_and_load_roundtrip() {
+    fn serde_roundtrip_via_from_file() {
         // Write to a temp file and reload using from_file.
         let dir = std::env::temp_dir().join("doh_proxy_test");
         std::fs::create_dir_all(&dir).unwrap();
@@ -155,5 +164,23 @@ mod tests {
         assert_eq!(loaded.upstreams[0], "https://dns.quad9.net/dns-query");
         assert!(!loaded.cache.enabled);
         assert_eq!(loaded.cache.capacity, 500);
+    }
+
+    #[test]
+    fn save_writes_valid_toml() {
+        let dir = std::env::temp_dir().join(format!("doh_proxy_save_test_{}", std::process::id()));
+        let path = dir.join("config.toml");
+        let config = Config {
+            listen_addr: "127.0.0.1:5353".parse().unwrap(),
+            upstreams: vec!["https://dns.quad9.net/dns-query".into()],
+            cache: CacheConfig { capacity: 500, enabled: false },
+        };
+        config.save_to(&path).unwrap();
+        let loaded = Config::from_file(&path).unwrap();
+        assert_eq!(loaded.listen_addr.to_string(), "127.0.0.1:5353");
+        assert_eq!(loaded.upstreams[0], "https://dns.quad9.net/dns-query");
+        assert!(!loaded.cache.enabled);
+        assert_eq!(loaded.cache.capacity, 500);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
