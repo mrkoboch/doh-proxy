@@ -47,7 +47,7 @@ export function Sidebar({ current, onNavigate, running }: Props) {
       </nav>
 
       <div className="px-4 py-3 border-t border-border">
-        <span className="text-xs text-muted">v0.1.0</span>
+        <span className="text-xs text-muted">v0.1.3</span>
       </div>
     </aside>
   );
