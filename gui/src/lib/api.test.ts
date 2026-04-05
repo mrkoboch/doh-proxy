@@ -3,7 +3,7 @@ import * as tauriCore from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core");
 
-const { startProxy, stopProxy, getProxyStatus, getStats, getLogEntries, loadConfig, saveConfig } =
+const { startProxy, stopProxy, getProxyStatus, getStats, getLogEntries, saveConfig } =
   await import("./api");
 
 describe("api", () => {
