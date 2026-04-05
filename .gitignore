@@ -1,3 +1,5 @@
 /target
 Cargo.lock
 .worktrees/
+gui/node_modules/
+gui/dist/
