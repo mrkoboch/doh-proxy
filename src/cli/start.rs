@@ -16,7 +16,7 @@ use doh_proxy::{
 pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Result<()> {
     // Check if already running
     if let Some(pid) = runtime::read_pid()? {
-        if process_running(pid) {
+        if runtime::process_running(pid) {
             eprintln!(
                 "{} doh-proxy is already running (PID {pid}). Run `doh-proxy stop` first.",
                 style("✗").red()
@@ -43,10 +43,11 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
     if let Some(parent) = log_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let file_appender = tracing_appender::rolling::never(
-        log_path.parent().unwrap(),
-        log_path.file_name().unwrap(),
-    );
+    let log_dir = log_path.parent()
+        .ok_or_else(|| anyhow::anyhow!("log path has no parent: {}", log_path.display()))?;
+    let log_file = log_path.file_name()
+        .ok_or_else(|| anyhow::anyhow!("log path has no file name: {}", log_path.display()))?;
+    let file_appender = tracing_appender::rolling::never(log_dir, log_file);
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -168,16 +169,3 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
     Ok(())
 }
 
-/// Returns true if a process with this PID is currently running.
-/// Sending signal 0 checks process existence without actually signaling.
-#[cfg(unix)]
-fn process_running(pid: u32) -> bool {
-    use nix::sys::signal::kill;
-    use nix::unistd::Pid;
-    kill(Pid::from_raw(pid as i32), None).is_ok()
-}
-
-#[cfg(not(unix))]
-fn process_running(_pid: u32) -> bool {
-    false
-}

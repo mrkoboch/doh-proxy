@@ -61,6 +61,21 @@ pub fn read_runtime_stats() -> anyhow::Result<Option<RuntimeStats>> {
     read_runtime_stats_from(&runtime_dir())
 }
 
+/// Returns true if a process with this PID is currently running.
+/// On Unix, sends signal 0 (no-op signal that checks process existence).
+/// On non-Unix, always returns false.
+#[cfg(unix)]
+pub fn process_running(pid: u32) -> bool {
+    use nix::sys::signal::kill;
+    use nix::unistd::Pid;
+    kill(Pid::from_raw(pid as i32), None).is_ok()
+}
+
+#[cfg(not(unix))]
+pub fn process_running(_pid: u32) -> bool {
+    false
+}
+
 // --- Internal helpers (accept &Path for testability) ---
 
 pub(crate) fn write_pid_to(dir: &Path, pid: u32) -> anyhow::Result<()> {

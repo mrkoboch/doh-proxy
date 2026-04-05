@@ -9,7 +9,7 @@ pub fn run() -> anyhow::Result<()> {
     let stats = runtime::read_runtime_stats()?;
 
     match (pid, stats) {
-        (Some(pid), Some(rs)) if process_running(pid) => {
+        (Some(pid), Some(rs)) if runtime::process_running(pid) => {
             let uptime = format_uptime(rs.started_at);
             let hit_rate = if rs.snapshot.total > 0 {
                 format!("{:.1}%", rs.snapshot.cache_hits as f64 / rs.snapshot.total as f64 * 100.0)
@@ -83,18 +83,6 @@ fn format_uptime(started_at: u64) -> String {
     } else {
         format!("{s}s")
     }
-}
-
-#[cfg(unix)]
-fn process_running(pid: u32) -> bool {
-    use nix::sys::signal::kill;
-    use nix::unistd::Pid;
-    kill(Pid::from_raw(pid as i32), None).is_ok()
-}
-
-#[cfg(not(unix))]
-fn process_running(_pid: u32) -> bool {
-    true // assume running on non-Unix if pidfile exists
 }
 
 #[cfg(test)]

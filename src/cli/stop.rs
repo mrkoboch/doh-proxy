@@ -14,7 +14,7 @@ pub fn run() -> anyhow::Result<()> {
         }
     };
 
-    if !process_running(pid) {
+    if !runtime::process_running(pid) {
         // Stale pidfile
         runtime::clear_pid().ok();
         println!("{} doh-proxy is not running (stale PID file removed).", style("○").dim());
@@ -32,7 +32,7 @@ pub fn run() -> anyhow::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         thread::sleep(Duration::from_millis(100));
-        if !process_running(pid) {
+        if !runtime::process_running(pid) {
             println!("{} Stopped.", style("○").dim());
             return Ok(());
         }
@@ -47,23 +47,11 @@ pub fn run() -> anyhow::Result<()> {
 }
 
 #[cfg(unix)]
-fn process_running(pid: u32) -> bool {
-    use nix::sys::signal::kill;
-    use nix::unistd::Pid;
-    kill(Pid::from_raw(pid as i32), None).is_ok()
-}
-
-#[cfg(unix)]
 fn send_sigterm(pid: u32) -> anyhow::Result<()> {
     use nix::sys::signal::{kill, Signal};
     use nix::unistd::Pid;
     kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
         .map_err(|e| anyhow::anyhow!("failed to send SIGTERM to {pid}: {e}"))
-}
-
-#[cfg(not(unix))]
-fn process_running(_pid: u32) -> bool {
-    false
 }
 
 #[cfg(not(unix))]

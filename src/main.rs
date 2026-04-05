@@ -42,9 +42,9 @@ enum Commands {
         #[arg(short = 'n', long, default_value = "20")]
         lines: usize,
 
-        /// Keep following new log lines (like tail -f)
-        #[arg(short, long, default_value = "true")]
-        follow: bool,
+        /// Stop after showing history (do not follow new lines)
+        #[arg(long = "no-follow")]
+        no_follow: bool,
     },
 
     /// Gracefully stop a running proxy
@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Start { listen, upstreams } => cli::start::run(listen, upstreams).await,
         Commands::Config => cli::config_cmd::run(),
         Commands::Status => cli::status::run(),
-        Commands::Logs { lines, follow } => cli::logs::run(follow, lines),
+        Commands::Logs { lines, no_follow } => cli::logs::run(!no_follow, lines),
         Commands::Stop => cli::stop::run(),
     }
 }
