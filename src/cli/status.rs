@@ -12,23 +12,26 @@ pub fn run() -> anyhow::Result<()> {
         (Some(pid), Some(rs)) if runtime::process_running(pid) => {
             let uptime = format_uptime(rs.started_at);
             let hit_rate = if rs.snapshot.total > 0 {
-                format!("{:.1}%", rs.snapshot.cache_hits as f64 / rs.snapshot.total as f64 * 100.0)
+                format!(
+                    "{:.1}%",
+                    rs.snapshot.cache_hits as f64 / rs.snapshot.total as f64 * 100.0
+                )
             } else {
                 "—".into()
             };
 
             println!("{}", style("● doh-proxy").green().bold());
-            println!("  {:<14} {}", style("Status:").dim(), style("running").green());
+            println!(
+                "  {:<14} {}",
+                style("Status:").dim(),
+                style("running").green()
+            );
             println!("  {:<14} {}", style("PID:").dim(), pid);
             println!("  {:<14} {}", style("Uptime:").dim(), uptime);
             println!("  {:<14} {}", style("Listen:").dim(), rs.listen_addr);
             println!();
             println!("{}", style("  Queries").bold());
-            println!(
-                "  {:<14} {}",
-                style("Total:").dim(),
-                rs.snapshot.total
-            );
+            println!("  {:<14} {}", style("Total:").dim(), rs.snapshot.total);
             println!(
                 "  {:<14} {} ({})",
                 style("Cache hits:").dim(),
@@ -59,7 +62,11 @@ pub fn run() -> anyhow::Result<()> {
         }
         _ => {
             println!("{}", style("○ doh-proxy").dim().bold());
-            println!("  {:<14} {}", style("Status:").dim(), style("stopped").yellow());
+            println!(
+                "  {:<14} {}",
+                style("Status:").dim(),
+                style("stopped").yellow()
+            );
             println!("\n  Run `doh-proxy start` to start the proxy.");
         }
     }

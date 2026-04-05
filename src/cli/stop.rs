@@ -17,14 +17,14 @@ pub fn run() -> anyhow::Result<()> {
     if !runtime::process_running(pid) {
         // Stale pidfile
         runtime::clear_pid().ok();
-        println!("{} doh-proxy is not running (stale PID file removed).", style("○").dim());
+        println!(
+            "{} doh-proxy is not running (stale PID file removed).",
+            style("○").dim()
+        );
         return Ok(());
     }
 
-    println!(
-        "{} Stopping doh-proxy (PID {pid})...",
-        style("◼").yellow()
-    );
+    println!("{} Stopping doh-proxy (PID {pid})...", style("◼").yellow());
 
     send_sigterm(pid)?;
 

@@ -28,7 +28,7 @@ impl std::fmt::Display for QueryStatus {
         match self {
             QueryStatus::CacheHit => write!(f, "Cache Hit"),
             QueryStatus::Upstream => write!(f, "Upstream"),
-            QueryStatus::Error    => write!(f, "Error"),
+            QueryStatus::Error => write!(f, "Error"),
         }
     }
 }
@@ -42,10 +42,10 @@ pub struct StatsSnapshot {
 }
 
 pub struct Stats {
-    total_queries:    AtomicU64,
-    cache_hits:       AtomicU64,
+    total_queries: AtomicU64,
+    cache_hits: AtomicU64,
     upstream_queries: AtomicU64,
-    errors:           AtomicU64,
+    errors: AtomicU64,
     log: Mutex<VecDeque<LogEntry>>,
 }
 
@@ -59,10 +59,10 @@ pub fn unix_now() -> u64 {
 impl Stats {
     pub fn new() -> Self {
         Self {
-            total_queries:    AtomicU64::new(0),
-            cache_hits:       AtomicU64::new(0),
+            total_queries: AtomicU64::new(0),
+            cache_hits: AtomicU64::new(0),
             upstream_queries: AtomicU64::new(0),
-            errors:           AtomicU64::new(0),
+            errors: AtomicU64::new(0),
             log: Mutex::new(VecDeque::with_capacity(LOG_CAPACITY)),
         }
     }
@@ -70,9 +70,15 @@ impl Stats {
     pub fn record(&self, entry: LogEntry) {
         self.total_queries.fetch_add(1, Ordering::Relaxed);
         match entry.status {
-            QueryStatus::CacheHit => { self.cache_hits.fetch_add(1, Ordering::Relaxed); }
-            QueryStatus::Upstream => { self.upstream_queries.fetch_add(1, Ordering::Relaxed); }
-            QueryStatus::Error    => { self.errors.fetch_add(1, Ordering::Relaxed); }
+            QueryStatus::CacheHit => {
+                self.cache_hits.fetch_add(1, Ordering::Relaxed);
+            }
+            QueryStatus::Upstream => {
+                self.upstream_queries.fetch_add(1, Ordering::Relaxed);
+            }
+            QueryStatus::Error => {
+                self.errors.fetch_add(1, Ordering::Relaxed);
+            }
         }
         let mut log = self.log.lock().unwrap();
         if log.len() >= LOG_CAPACITY {
@@ -81,17 +87,25 @@ impl Stats {
         log.push_back(entry);
     }
 
-    pub fn total(&self)      -> u64 { self.total_queries.load(Ordering::Relaxed) }
-    pub fn cache_hits(&self) -> u64 { self.cache_hits.load(Ordering::Relaxed) }
-    pub fn upstream(&self)   -> u64 { self.upstream_queries.load(Ordering::Relaxed) }
-    pub fn errors(&self)     -> u64 { self.errors.load(Ordering::Relaxed) }
+    pub fn total(&self) -> u64 {
+        self.total_queries.load(Ordering::Relaxed)
+    }
+    pub fn cache_hits(&self) -> u64 {
+        self.cache_hits.load(Ordering::Relaxed)
+    }
+    pub fn upstream(&self) -> u64 {
+        self.upstream_queries.load(Ordering::Relaxed)
+    }
+    pub fn errors(&self) -> u64 {
+        self.errors.load(Ordering::Relaxed)
+    }
 
     pub fn snapshot(&self) -> StatsSnapshot {
         StatsSnapshot {
-            total:      self.total(),
+            total: self.total(),
             cache_hits: self.cache_hits(),
-            upstream:   self.upstream(),
-            errors:     self.errors(),
+            upstream: self.upstream(),
+            errors: self.errors(),
         }
     }
 
@@ -105,11 +119,23 @@ mod tests {
     use super::*;
 
     fn make_entry(status: QueryStatus) -> LogEntry {
-        LogEntry { timestamp_unix: 0, query_name: "a.com".into(), query_type: "A".into(), status, latency_ms: 1 }
+        LogEntry {
+            timestamp_unix: 0,
+            query_name: "a.com".into(),
+            query_type: "A".into(),
+            status,
+            latency_ms: 1,
+        }
     }
 
     fn make_entry_named(name: &str, status: QueryStatus) -> LogEntry {
-        LogEntry { timestamp_unix: 0, query_name: name.into(), query_type: "A".into(), status, latency_ms: 0 }
+        LogEntry {
+            timestamp_unix: 0,
+            query_name: name.into(),
+            query_type: "A".into(),
+            status,
+            latency_ms: 0,
+        }
     }
 
     #[test]

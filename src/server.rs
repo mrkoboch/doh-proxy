@@ -6,12 +6,7 @@ use tokio::net::UdpSocket;
 use tracing::{error, info};
 
 use crate::{
-    cache::DnsCache,
-    config::Config,
-    error::Result,
-    proxy::Proxy,
-    resolver::Resolver,
-    stats::Stats,
+    cache::DnsCache, config::Config, error::Result, proxy::Proxy, resolver::Resolver, stats::Stats,
     upstream::UpstreamClient,
 };
 
@@ -48,11 +43,7 @@ impl Server {
                 info!("stop signal received, shutting down");
                 break;
             }
-            match tokio::time::timeout(
-                Duration::from_millis(100),
-                socket.recv_from(&mut buf),
-            )
-            .await
+            match tokio::time::timeout(Duration::from_millis(100), socket.recv_from(&mut buf)).await
             {
                 Ok(Ok((len, peer))) => {
                     consecutive_errors = 0;

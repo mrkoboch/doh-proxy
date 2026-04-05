@@ -43,9 +43,11 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
     if let Some(parent) = log_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let log_dir = log_path.parent()
+    let log_dir = log_path
+        .parent()
         .ok_or_else(|| anyhow::anyhow!("log path has no parent: {}", log_path.display()))?;
-    let log_file = log_path.file_name()
+    let log_file = log_path
+        .file_name()
         .ok_or_else(|| anyhow::anyhow!("log path has no file name: {}", log_path.display()))?;
     let file_appender = tracing_appender::rolling::never(log_dir, log_file);
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -64,8 +66,7 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
                 .with_target(false),
         )
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -109,7 +110,10 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
         style("Log:").dim(),
         log_path.display()
     );
-    println!("{}", style("  Press Ctrl+C or run `doh-proxy stop` to quit.").dim());
+    println!(
+        "{}",
+        style("  Press Ctrl+C or run `doh-proxy stop` to quit.").dim()
+    );
 
     // Spawn stats writer task
     let stats_handle = {
@@ -162,10 +166,9 @@ pub async fn run(listen: Option<String>, upstreams: Vec<String>) -> anyhow::Resu
     println!("\n{} Shutting down...", style("◼").yellow());
     stop_flag.store(true, Ordering::Release);
     let _ = server_thread.join();
-    let _ = stats_handle.await;   // flush final stats snapshot
+    let _ = stats_handle.await; // flush final stats snapshot
     runtime::clear_pid().ok();
     println!("{} Stopped.", style("●").dim());
 
     Ok(())
 }
-

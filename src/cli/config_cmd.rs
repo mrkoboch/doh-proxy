@@ -1,16 +1,13 @@
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input};
 
-use doh_proxy::config::{CacheConfig, Config, config_path};
+use doh_proxy::config::{config_path, CacheConfig, Config};
 
 pub fn run() -> anyhow::Result<()> {
     let theme = ColorfulTheme::default();
     let current = Config::load_or_create()?;
 
-    println!(
-        "{} Interactive config setup",
-        style("◆").cyan().bold()
-    );
+    println!("{} Interactive config setup", style("◆").cyan().bold());
     println!(
         "  Config path: {}\n",
         style(config_path().display().to_string()).dim()

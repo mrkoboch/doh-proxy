@@ -74,8 +74,8 @@ pub fn config_path() -> PathBuf {
 
 impl Config {
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
-        let contents = std::fs::read_to_string(path)
-            .map_err(|e| ProxyError::Config(e.to_string()))?;
+        let contents =
+            std::fs::read_to_string(path).map_err(|e| ProxyError::Config(e.to_string()))?;
         toml::from_str(&contents).map_err(|e| ProxyError::Config(e.to_string()))
     }
 
@@ -83,7 +83,9 @@ impl Config {
     pub fn load_or_create() -> Result<Self> {
         let path = config_path();
         match std::fs::read_to_string(&path) {
-            Ok(contents) => toml::from_str(&contents).map_err(|e| ProxyError::Config(e.to_string())),
+            Ok(contents) => {
+                toml::from_str(&contents).map_err(|e| ProxyError::Config(e.to_string()))
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 let config = Self::default();
                 config.save()?;
@@ -95,13 +97,11 @@ impl Config {
 
     fn save_to(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| ProxyError::Config(e.to_string()))?;
+            std::fs::create_dir_all(parent).map_err(|e| ProxyError::Config(e.to_string()))?;
         }
-        let contents = toml::to_string_pretty(self)
-            .map_err(|e| ProxyError::Config(e.to_string()))?;
-        std::fs::write(path, contents)
-            .map_err(|e| ProxyError::Config(e.to_string()))?;
+        let contents =
+            toml::to_string_pretty(self).map_err(|e| ProxyError::Config(e.to_string()))?;
+        std::fs::write(path, contents).map_err(|e| ProxyError::Config(e.to_string()))?;
         Ok(())
     }
 
@@ -153,7 +153,10 @@ mod tests {
         let original = Config {
             listen_addr: "127.0.0.1:5353".parse().unwrap(),
             upstreams: vec!["https://dns.quad9.net/dns-query".into()],
-            cache: CacheConfig { capacity: 500, enabled: false },
+            cache: CacheConfig {
+                capacity: 500,
+                enabled: false,
+            },
         };
 
         let contents = toml::to_string_pretty(&original).unwrap();
@@ -173,7 +176,10 @@ mod tests {
         let config = Config {
             listen_addr: "127.0.0.1:5353".parse().unwrap(),
             upstreams: vec!["https://dns.quad9.net/dns-query".into()],
-            cache: CacheConfig { capacity: 500, enabled: false },
+            cache: CacheConfig {
+                capacity: 500,
+                enabled: false,
+            },
         };
         config.save_to(&path).unwrap();
         let loaded = Config::from_file(&path).unwrap();

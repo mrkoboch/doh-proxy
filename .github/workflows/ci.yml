@@ -35,10 +35,10 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build
-        run: cargo build --locked
+        run: cargo build
 
       - name: Run tests
-        run: cargo test --locked
+        run: cargo test
 
   lint:
     name: Lint

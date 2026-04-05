@@ -131,8 +131,11 @@ mod tests {
     use std::fs;
 
     fn tmp_dir(label: &str) -> PathBuf {
-        let d = std::env::temp_dir()
-            .join(format!("doh_proxy_runtime_{}_{}", std::process::id(), label));
+        let d = std::env::temp_dir().join(format!(
+            "doh_proxy_runtime_{}_{}",
+            std::process::id(),
+            label
+        ));
         fs::create_dir_all(&d).unwrap();
         d
     }
@@ -166,7 +169,12 @@ mod tests {
     fn write_and_read_stats() {
         let dir = tmp_dir("write_and_read_stats");
         let rs = RuntimeStats {
-            snapshot: StatsSnapshot { total: 10, cache_hits: 3, upstream: 6, errors: 1 },
+            snapshot: StatsSnapshot {
+                total: 10,
+                cache_hits: 3,
+                upstream: 6,
+                errors: 1,
+            },
             listen_addr: "0.0.0.0:5353".into(),
             started_at: 1000,
         };

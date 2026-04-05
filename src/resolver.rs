@@ -2,11 +2,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bytes::Bytes;
-use hickory_proto::{
-    op::Message,
-    rr::RecordType,
-    serialize::binary::BinDecodable,
-};
+use hickory_proto::{op::Message, rr::RecordType, serialize::binary::BinDecodable};
 use tracing::debug;
 
 use crate::{
@@ -23,8 +19,16 @@ pub struct Resolver {
 }
 
 impl Resolver {
-    pub fn new(upstream: UpstreamClient, cache: Option<DnsCache>, stats: Option<Arc<Stats>>) -> Self {
-        Self { upstream, cache, stats }
+    pub fn new(
+        upstream: UpstreamClient,
+        cache: Option<DnsCache>,
+        stats: Option<Arc<Stats>>,
+    ) -> Self {
+        Self {
+            upstream,
+            cache,
+            stats,
+        }
     }
 
     pub async fn resolve(&self, raw_query: &[u8]) -> Result<Bytes> {
@@ -32,7 +36,12 @@ impl Resolver {
         let msg = match Message::from_bytes(raw_query) {
             Ok(m) => m,
             Err(e) => {
-                self.record_stat("<parse-error>".into(), "?".into(), QueryStatus::Error, start);
+                self.record_stat(
+                    "<parse-error>".into(),
+                    "?".into(),
+                    QueryStatus::Error,
+                    start,
+                );
                 return Err(ProxyError::DnsParse(e));
             }
         };
@@ -51,7 +60,9 @@ impl Resolver {
             Ok(response_bytes) => {
                 let min_ttl = extract_min_ttl(&response_bytes).unwrap_or(60);
                 if let Some(ref cache) = self.cache {
-                    cache.insert(cache_key, response_bytes.clone(), min_ttl).await;
+                    cache
+                        .insert(cache_key, response_bytes.clone(), min_ttl)
+                        .await;
                 }
                 self.record_stat(query_name, query_type_str, QueryStatus::Upstream, start);
                 Ok(response_bytes)
