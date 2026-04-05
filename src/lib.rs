@@ -6,5 +6,4 @@ pub mod resolver;
 pub mod runtime;
 pub mod server;
 pub mod stats;
-pub mod tui;
 pub mod upstream;
