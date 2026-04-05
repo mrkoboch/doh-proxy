@@ -10,21 +10,22 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: doh-proxy-gui
+            binary: doh-proxy-gui
             archive: doh-proxy-gui-macos-arm64.tar.gz
 
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact: doh-proxy-gui
+            binary: doh-proxy-gui
             archive: doh-proxy-gui-macos-x86_64.tar.gz
 
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: doh-proxy-gui
+            binary: doh-proxy-gui
             archive: doh-proxy-gui-linux-x86_64.tar.gz
 
     steps:
@@ -35,18 +36,53 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Linux deps
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y libgl1-mesa-dev libx11-dev libwayland-dev pkg-config
-
-      - name: Build
-        run: cargo build --release --features gui --bin doh-proxy-gui --target ${{ matrix.target }}
-
-      - name: Package
         run: |
-          tar -czf ${{ matrix.archive }} -C target/${{ matrix.target }}/release ${{ matrix.artifact }}
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config
 
-      - name: Upload
+      - name: Install npm dependencies
+        working-directory: gui
+        run: npm ci
+
+      - name: Build TypeScript frontend
+        working-directory: gui
+        run: npm run build
+
+      - name: Build Tauri binary
+        run: |
+          cargo build \
+            --manifest-path gui/src-tauri/Cargo.toml \
+            --release \
+            --target ${{ matrix.target }}
+
+      - name: Stage release directory
+        run: |
+          STAGING="staging/doh-proxy-gui"
+          mkdir -p "$STAGING/config"
+          cp gui/src-tauri/target/${{ matrix.target }}/release/${{ matrix.binary }} "$STAGING/"
+          cp config/default.toml "$STAGING/config/"
+          cp README.md "$STAGING/"
+
+      - name: Create archive
+        run: |
+          tar -czf ${{ matrix.archive }} -C staging doh-proxy-gui
+
+      - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.archive }}
