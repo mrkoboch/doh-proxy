@@ -56,6 +56,12 @@ pub fn unix_now() -> u64 {
         .as_secs()
 }
 
+impl Default for Stats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Stats {
     pub fn new() -> Self {
         Self {

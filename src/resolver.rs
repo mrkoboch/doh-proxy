@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bytes::Bytes;
-use hickory_proto::{op::Message, rr::RecordType, serialize::binary::BinDecodable};
+use hickory_proto::{op::Message, serialize::binary::BinDecodable};
 use tracing::debug;
 
 use crate::{
@@ -91,7 +91,7 @@ fn extract_query_parts(msg: &Message) -> (String, String, CacheKey) {
     if let Some(q) = msg.queries().first() {
         let name = q.name().to_lowercase().to_string();
         let qtype_u16: u16 = q.query_type().into();
-        let qtype_str = format!("{}", RecordType::from(q.query_type()));
+        let qtype_str = format!("{}", q.query_type());
         (name.clone(), qtype_str, (name, qtype_u16))
     } else {
         (String::new(), "?".into(), (String::new(), 0))

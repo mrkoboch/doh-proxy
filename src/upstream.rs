@@ -53,6 +53,6 @@ impl UpstreamClient {
             return Err(ProxyError::InvalidUpstreamResponse);
         }
 
-        Ok(response.bytes().await.map_err(ProxyError::Upstream)?)
+        response.bytes().await.map_err(ProxyError::Upstream)
     }
 }

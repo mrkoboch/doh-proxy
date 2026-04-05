@@ -63,7 +63,7 @@ pub fn run(follow: bool, lines: usize) -> anyhow::Result<()> {
 /// Read the entire file line-by-line and return the last `n` lines.
 fn collect_last_lines(reader: &mut BufReader<File>, n: usize) -> anyhow::Result<Vec<String>> {
     reader.seek(SeekFrom::Start(0))?;
-    let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+    let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
     let start = lines.len().saturating_sub(n);
     Ok(lines[start..].to_vec())
 }
