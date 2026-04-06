@@ -125,9 +125,10 @@ Binaries are placed in `./target/release/`:
 ./target/release/dns-dashboard    # Stats dashboard (self-contained)
 ```
 
-Install both to `~/.cargo/bin/`:
+To install both to `~/.cargo/bin/` (must be run from inside the cloned repo):
 
 ```sh
+cd doh-proxy                                          # if not already inside
 cargo install --path . --bin doh-proxy
 cargo install --path dns-dashboard --bin dns-dashboard
 ```
