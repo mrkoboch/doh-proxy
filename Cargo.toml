@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "dns-dashboard"]
+resolver = "2"
+
 [package]
 name = "doh-rs"
 version = "0.1.1"
