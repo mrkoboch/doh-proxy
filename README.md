@@ -2,6 +2,8 @@
 
 A DNS-over-HTTPS proxy with a polished terminal interface. Forwards DNS queries to upstream DoH resolvers (Cloudflare, Google, Quad9, or any RFC 8484-compatible server) and caches responses locally to minimise upstream round-trips.
 
+**v0.1.1** adds the DNS Stats Dashboard — a self-contained web UI for visualising query activity in real time. The dashboard is a single binary that embeds the full frontend; no Node.js or separate web server is required at runtime.
+
 ```
 ● Listening on 127.0.0.1:5300
   Upstreams: https://1.1.1.1/dns-query, https://8.8.8.8/dns-query
@@ -13,13 +15,17 @@ A DNS-over-HTTPS proxy with a polished terminal interface. Forwards DNS queries 
 
 ## Table of contents
 
+- [What's new in v0.1.1](#whats-new-in-v011)
 - [Prerequisites](#prerequisites)
 - [Install](#install)
-  - [Linux](#linux)
-  - [macOS](#macos)
-  - [Windows](#windows)
+  - [Linux / macOS / Windows](#linux--macos--windows)
   - [Build from source](#build-from-source)
 - [Quick start](#quick-start)
+- [DNS Stats Dashboard](#dns-stats-dashboard)
+  - [Running the dashboard](#running-the-dashboard)
+  - [Environment variables](#environment-variables)
+  - [Expected log format](#expected-log-format)
+  - [API endpoints](#api-endpoints)
 - [Commands](#commands)
 - [Configuration](#configuration)
 - [Pointing your system DNS at the proxy](#pointing-your-system-dns-at-the-proxy)
@@ -30,66 +36,100 @@ A DNS-over-HTTPS proxy with a polished terminal interface. Forwards DNS queries 
 - [Running on port 53](#running-on-port-53)
 - [Runtime files](#runtime-files)
 - [Logging](#logging)
+- [Upgrading from v0.1.0](#upgrading-from-v010)
 - [License](#license)
+
+---
+
+## What's new in v0.1.1
+
+| Component | Change |
+|---|---|
+| `dns-dashboard` binary | New — real-time DNS stats dashboard with embedded React frontend |
+| Workspace | Repository is now a Cargo workspace (`doh-rs` + `dns-dashboard`) |
+| `.gitignore` | SQLite database files (`*.db`) excluded |
+
+The `doh-proxy` binary itself is unchanged from v0.1.0. Upgrading only adds the new `dns-dashboard` binary alongside it.
 
 ---
 
 ## Prerequisites
 
-**Rust 1.77 or later** is the only build-time dependency. The binary uses [rustls](https://github.com/rustls/rustls) for TLS, so no OpenSSL or system SSL libraries are required on any platform.
+### For running pre-built binaries
 
-### Install Rust
+None. Both binaries are statically linked with [rustls](https://github.com/rustls/rustls) — no OpenSSL, no system SSL libraries, no runtime dependencies.
+
+### For building from source
+
+| Dependency | Version | Required for |
+|---|---|---|
+| Rust | 1.77 or later | Both binaries |
+| Node.js | 18 or later | `dns-dashboard` only (embedded at compile time) |
+
+**Install Rust:**
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Then follow the on-screen instructions and open a new terminal (or run `source ~/.cargo/env`) so that `cargo` is on your `PATH`.
+> **Windows:** Download and run the [rustup installer](https://rustup.rs) and install the [MSVC Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++" workload).
 
-> **Windows:** Download and run the [rustup installer](https://rustup.rs) instead.
-> You will also need the [MSVC Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (choose "Desktop development with C++" workload).
+**Install Node.js** (required only when building `dns-dashboard` from source):
+
+```sh
+# macOS — Homebrew
+brew install node
+
+# Linux — NodeSource
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Any platform — NVM
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+nvm install 20
+```
+
+Node.js is only needed at build time. The resulting `dns-dashboard` binary contains the full frontend and has no runtime dependency on Node.
 
 ---
 
 ## Install
 
-### Linux
+### Linux / macOS / Windows
+
+Install the DNS proxy from crates.io:
 
 ```sh
 cargo install doh-rs
 ```
 
-The binary (`doh-proxy`) is placed in `~/.cargo/bin/`. Make sure that directory is on your `PATH` (the rustup installer adds it automatically).
-
-### macOS
-
-```sh
-cargo install doh-rs
-```
-
-Works on both Apple Silicon (ARM) and Intel. No Homebrew or system dependencies needed.
-
-### Windows
-
-```sh
-cargo install doh-rs
-```
-
-> **Note:** `doh-proxy stop` is not supported on Windows (it uses Unix signals). Use Ctrl+C in the terminal where `doh-proxy start` is running instead. All other commands work normally.
+The `dns-dashboard` binary is not published to crates.io. Build it from source (see below).
 
 ### Build from source
 
 ```sh
 git clone https://github.com/mrkoboch/doh-proxy
 cd doh-proxy
-cargo build --release
-# Binary is at ./target/release/doh-proxy
+
+# Build the proxy
+cargo build --release -p doh-rs
+
+# Build the dashboard (requires Node.js — see Prerequisites)
+cargo build --release -p dns-dashboard
 ```
 
-Or install directly from the cloned repository:
+Binaries are placed in `./target/release/`:
+
+```
+./target/release/doh-proxy        # DNS-over-HTTPS proxy
+./target/release/dns-dashboard    # Stats dashboard (self-contained)
+```
+
+Install both to `~/.cargo/bin/`:
 
 ```sh
-cargo install --path .
+cargo install --path . --bin doh-proxy
+cargo install --path dns-dashboard --bin dns-dashboard
 ```
 
 ---
@@ -110,10 +150,101 @@ doh-proxy logs
 doh-proxy stop
 ```
 
-To change the listen address, upstream resolvers, or cache settings:
+To also run the dashboard alongside the proxy:
 
 ```sh
-doh-proxy config
+# Terminal 1
+doh-proxy start
+
+# Terminal 2 — point the dashboard at the proxy log
+LOG_FILE=~/.local/share/doh-proxy/doh-proxy.log dns-dashboard
+
+# Open http://127.0.0.1:4000 in your browser
+```
+
+---
+
+## DNS Stats Dashboard
+
+`dns-dashboard` is a standalone HTTP server that:
+
+- Tails a log file produced by `doh-proxy` and stores parsed entries in a local SQLite database
+- Serves a React dashboard at `http://127.0.0.1:4000` with live stats, a query feed, and charts
+- Refreshes all data in the browser every 5 seconds
+
+The dashboard and the proxy are fully decoupled — they share nothing at runtime except the log file.
+
+### Running the dashboard
+
+```sh
+dns-dashboard
+```
+
+Then open `http://127.0.0.1:4000` in a browser on the same machine.
+
+For remote access (e.g. from a laptop to a server), port-forward over SSH:
+
+```sh
+ssh -L 4000:127.0.0.1:4000 user@your-server
+# then open http://127.0.0.1:4000 locally
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_FILE` | `./proxy.log` | Path to the log file to tail |
+| `DATABASE_URL` | `sqlite://dashboard.db` | SQLite database path (created automatically) |
+| `LISTEN_ADDR` | `127.0.0.1:4000` | Address and port to serve the dashboard on |
+
+Example — run on a custom port with an absolute log path:
+
+```sh
+LOG_FILE=/var/log/doh-proxy.log LISTEN_ADDR=127.0.0.1:8080 dns-dashboard
+```
+
+### Expected log format
+
+The dashboard ingestor parses lines in the following space-separated format:
+
+```
+TIMESTAMP DOMAIN TYPE [BLOCKED] [latency=Xms] [resolver=URL]
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `TIMESTAMP` | Yes | ISO 8601 UTC, e.g. `2026-04-06T12:00:00Z` |
+| `DOMAIN` | Yes | Queried hostname, e.g. `example.com` |
+| `TYPE` | Yes | DNS record type, e.g. `A`, `AAAA`, `MX` |
+| `BLOCKED` | No | Literal word `BLOCKED` if the query was blocked |
+| `latency=Xms` | No | Round-trip latency in milliseconds, e.g. `latency=42ms` |
+| `resolver=URL` | No | Upstream resolver used, e.g. `resolver=https://1.1.1.1/dns-query` |
+
+Example lines:
+
+```
+2026-04-06T12:00:00Z example.com A latency=42ms resolver=https://1.1.1.1/dns-query
+2026-04-06T12:00:01Z ads.tracker.io AAAA BLOCKED latency=5ms
+2026-04-06T12:00:02Z plain.com A
+```
+
+Lines that do not match this format are skipped silently. The ingestor seeks to the end of the file on startup and only processes new lines — it will not re-import historical entries.
+
+### API endpoints
+
+The dashboard exposes a JSON API that can be queried directly:
+
+| Method | Path | Query params | Description |
+|---|---|---|---|
+| GET | `/api/stats` | — | Total queries, blocked count, average latency |
+| GET | `/api/queries/recent` | `limit` (default 50) | Most recent queries, newest first |
+| GET | `/api/queries/top-domains` | `limit` (default 10) | Most queried domains with counts |
+
+Example:
+
+```sh
+curl http://127.0.0.1:4000/api/stats
+# {"total":1042,"blocked":87,"avg_latency_ms":23.4}
 ```
 
 ---
@@ -121,7 +252,7 @@ doh-proxy config
 ## Commands
 
 | Command | Description |
-|---------|-------------|
+|---|---|
 | `doh-proxy start` | Start the proxy in the foreground. Ctrl+C or `doh-proxy stop` to quit. |
 | `doh-proxy start --listen 127.0.0.1:5300` | Override the listen address for this run. |
 | `doh-proxy start --upstream URL` | Override upstream resolvers (repeat for multiple). |
@@ -152,8 +283,8 @@ listen_addr = "127.0.0.1:5300"
 
 # Upstream DoH resolvers — tried in order, first success wins
 upstreams = [
-    "https://1.1.1.1/dns-query",         # Cloudflare
-    "https://8.8.8.8/dns-query",         # Google
+    "https://1.1.1.1/dns-query",          # Cloudflare
+    "https://8.8.8.8/dns-query",          # Google
     # "https://dns.quad9.net/dns-query",  # Quad9
     # "https://dns.adguard.com/dns-query", # AdGuard
 ]
@@ -166,7 +297,7 @@ capacity = 10000   # maximum cached entries
 ### Platform config paths
 
 | Platform | Path |
-|----------|------|
+|---|---|
 | Linux | `~/.config/doh-proxy/config.toml` |
 | macOS | `~/Library/Application Support/doh-proxy/config.toml` |
 | Windows | `%APPDATA%\doh-proxy\config\config.toml` |
@@ -273,6 +404,30 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now doh-proxy
 ```
 
+To also run the dashboard as a service, create `/etc/systemd/system/dns-dashboard.service`:
+
+```ini
+[Unit]
+Description=DNS Stats Dashboard
+After=network-online.target
+
+[Service]
+ExecStart=/home/YOUR_USER/.cargo/bin/dns-dashboard
+Environment=LOG_FILE=/home/YOUR_USER/.local/share/doh-proxy/doh-proxy.log
+Environment=DATABASE_URL=sqlite:///home/YOUR_USER/.local/share/doh-proxy/dashboard.db
+Restart=on-failure
+RestartSec=5s
+User=YOUR_USER
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now dns-dashboard
+```
+
 ### macOS — LaunchAgent (always-on without root)
 
 Create `~/Library/LaunchAgents/com.doh-proxy.plist`:
@@ -306,12 +461,18 @@ launchctl load ~/Library/LaunchAgents/com.doh-proxy.plist
 ## Runtime files
 
 | Platform | Path | Purpose |
-|----------|------|---------|
+|---|---|---|
 | Linux | `~/.local/share/doh-proxy/doh-proxy.pid` | PID of the running process |
 | Linux | `~/.local/share/doh-proxy/stats.json` | Live stats snapshot (updated every second) |
 | Linux | `~/.local/share/doh-proxy/doh-proxy.log` | Structured log output |
 | macOS | `~/Library/Application Support/doh-proxy/…` | Same files, different base path |
 | Windows | `%LOCALAPPDATA%\doh-proxy\…` | Same files, different base path |
+
+The `dns-dashboard` binary writes one additional file:
+
+| File | Default path | Purpose |
+|---|---|---|
+| `dashboard.db` | `./dashboard.db` (or `DATABASE_URL`) | SQLite database of parsed query history |
 
 ---
 
@@ -324,6 +485,41 @@ doh-proxy logs --no-follow  # last 20 lines, then exit
 ```
 
 Log lines are coloured by level — errors in red, warnings in yellow, debug output dimmed.
+
+---
+
+## Upgrading from v0.1.0
+
+The `doh-proxy` binary is unchanged. Upgrading adds the `dns-dashboard` binary and converts the repository to a Cargo workspace — no breaking changes to the proxy itself.
+
+### From crates.io
+
+```sh
+cargo install doh-rs
+```
+
+`dns-dashboard` is not on crates.io. Build it from source (see [Build from source](#build-from-source)).
+
+### From source
+
+```sh
+git -C doh-proxy pull
+git -C doh-proxy checkout v0.1.1
+
+# Rebuild the proxy (unchanged, rebuilds quickly)
+cargo install --path doh-proxy --bin doh-proxy
+
+# Build and install the dashboard (requires Node.js the first time)
+cargo install --path doh-proxy/dns-dashboard --bin dns-dashboard
+```
+
+### Configuration
+
+No configuration changes are required. All existing `doh-proxy` config files and runtime files are fully compatible with v0.1.1.
+
+### Data migration
+
+v0.1.1 introduces a new `dashboard.db` SQLite database. It is created automatically on first run of `dns-dashboard` and has no relation to any v0.1.0 files. No migration is needed.
 
 ---
 
