@@ -1,6 +1,6 @@
 [package]
 name = "doh-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A DNS-over-HTTPS proxy with a polished terminal interface"
 license = "MIT"

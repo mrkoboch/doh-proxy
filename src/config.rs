@@ -41,7 +41,7 @@ impl Default for CacheConfig {
 }
 
 fn default_listen_addr() -> SocketAddr {
-    "0.0.0.0:5353".parse().unwrap()
+    "127.0.0.1:5300".parse().unwrap()
 }
 
 fn default_upstreams() -> Vec<String> {

@@ -3,7 +3,7 @@
 A DNS-over-HTTPS proxy with a polished terminal interface. Forwards DNS queries to upstream DoH resolvers (Cloudflare, Google, Quad9, or any RFC 8484-compatible server) and caches responses locally to minimise upstream round-trips.
 
 ```
-● Listening on 0.0.0.0:5353
+● Listening on 127.0.0.1:5300
   Upstreams: https://1.1.1.1/dns-query, https://8.8.8.8/dns-query
   Log: ~/.local/share/doh-proxy/doh-proxy.log
   Press Ctrl+C or run `doh-proxy stop` to quit.
@@ -41,14 +41,13 @@ A DNS-over-HTTPS proxy with a polished terminal interface. Forwards DNS queries 
 ### Install Rust
 
 ```sh
-# All platforms — installs rustup + the stable toolchain
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 Then follow the on-screen instructions and open a new terminal (or run `source ~/.cargo/env`) so that `cargo` is on your `PATH`.
 
-> **Windows:** Download and run the [rustup installer](https://rustup.rs) instead.  
-> You will also need the [MSVC Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (choose "Desktop development with C++" workload) — these are required by the Rust toolchain itself, not by doh-proxy specifically.
+> **Windows:** Download and run the [rustup installer](https://rustup.rs) instead.
+> You will also need the [MSVC Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (choose "Desktop development with C++" workload).
 
 ---
 
@@ -57,17 +56,15 @@ Then follow the on-screen instructions and open a new terminal (or run `source ~
 ### Linux
 
 ```sh
-cargo install doh-proxy
+cargo install doh-rs
 ```
 
-The binary is placed in `~/.cargo/bin/`. Make sure that directory is on your `PATH` (the rustup installer adds it automatically).
-
-No additional system packages are required.
+The binary (`doh-proxy`) is placed in `~/.cargo/bin/`. Make sure that directory is on your `PATH` (the rustup installer adds it automatically).
 
 ### macOS
 
 ```sh
-cargo install doh-proxy
+cargo install doh-rs
 ```
 
 Works on both Apple Silicon (ARM) and Intel. No Homebrew or system dependencies needed.
@@ -75,7 +72,7 @@ Works on both Apple Silicon (ARM) and Intel. No Homebrew or system dependencies 
 ### Windows
 
 ```sh
-cargo install doh-proxy
+cargo install doh-rs
 ```
 
 > **Note:** `doh-proxy stop` is not supported on Windows (it uses Unix signals). Use Ctrl+C in the terminal where `doh-proxy start` is running instead. All other commands work normally.
@@ -89,7 +86,7 @@ cargo build --release
 # Binary is at ./target/release/doh-proxy
 ```
 
-To install directly from the cloned repository:
+Or install directly from the cloned repository:
 
 ```sh
 cargo install --path .
@@ -100,20 +97,23 @@ cargo install --path .
 ## Quick start
 
 ```sh
-# 1. Configure upstreams, listen address, and cache settings interactively
-doh-proxy config
-
-# 2. Start the proxy (runs in the foreground)
+# 1. Start the proxy
 doh-proxy start
 
-# 3. In a second terminal — check that it is running
+# 2. In a second terminal — check that it is running
 doh-proxy status
 
-# 4. Tail the live query log
+# 3. Tail the live query log
 doh-proxy logs
 
-# 5. Graceful shutdown
+# 4. Graceful shutdown
 doh-proxy stop
+```
+
+To change the listen address, upstream resolvers, or cache settings:
+
+```sh
+doh-proxy config
 ```
 
 ---
@@ -123,9 +123,9 @@ doh-proxy stop
 | Command | Description |
 |---------|-------------|
 | `doh-proxy start` | Start the proxy in the foreground. Ctrl+C or `doh-proxy stop` to quit. |
-| `doh-proxy start --listen 0.0.0.0:53` | Override the listen address for this run. |
+| `doh-proxy start --listen 127.0.0.1:5300` | Override the listen address for this run. |
 | `doh-proxy start --upstream URL` | Override upstream resolvers (repeat for multiple). |
-| `doh-proxy config` | Interactive setup — saves to `~/.config/doh-proxy/config.toml`. |
+| `doh-proxy config` | Interactive setup — saves to the config file. |
 | `doh-proxy status` | Show running status, PID, uptime, and query statistics. |
 | `doh-proxy logs` | Print the last 20 log lines and follow new entries. |
 | `doh-proxy logs -n 50` | Print the last 50 lines instead. |
@@ -133,8 +133,6 @@ doh-proxy stop
 | `doh-proxy stop` | Send SIGTERM to the running proxy and wait for it to exit. |
 
 ### Logging verbosity
-
-Set the `RUST_LOG` environment variable before starting:
 
 ```sh
 RUST_LOG=debug doh-proxy start   # verbose
@@ -145,16 +143,17 @@ RUST_LOG=warn  doh-proxy start   # quiet
 
 ## Configuration
 
-Config is stored at `~/.config/doh-proxy/config.toml` (created automatically with defaults on first run). Edit it directly or run `doh-proxy config` for an interactive prompt.
+Config is stored at the platform path below and created automatically with defaults on first run. Edit it directly or run `doh-proxy config` for an interactive prompt.
 
 ```toml
 # Address and port to listen on for DNS queries (UDP)
-listen_addr = "0.0.0.0:5353"
+# Binding to 127.0.0.1 restricts access to this machine only (recommended)
+listen_addr = "127.0.0.1:5300"
 
 # Upstream DoH resolvers — tried in order, first success wins
 upstreams = [
-    "https://1.1.1.1/dns-query",       # Cloudflare
-    "https://8.8.8.8/dns-query",       # Google
+    "https://1.1.1.1/dns-query",         # Cloudflare
+    "https://8.8.8.8/dns-query",         # Google
     # "https://dns.quad9.net/dns-query",  # Quad9
     # "https://dns.adguard.com/dns-query", # AdGuard
 ]
@@ -176,7 +175,14 @@ capacity = 10000   # maximum cached entries
 
 ## Pointing your system DNS at the proxy
 
-Once `doh-proxy start` is running, point your system DNS resolver at the listen address (default `127.0.0.1:5353`).
+Once `doh-proxy start` is running on `127.0.0.1:5300`, point your system resolver at it. Most system resolvers only query port 53, so the easiest path is to run on port 53 — see [Running on port 53](#running-on-port-53).
+
+If you prefer to keep the proxy on a high port, use a redirect:
+
+```sh
+# Linux — redirect port 53 UDP to 5300 (no root required for the proxy itself)
+sudo iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 5300
+```
 
 ### Linux (systemd-resolved)
 
@@ -185,7 +191,7 @@ Edit `/etc/systemd/resolved.conf`:
 ```ini
 [Resolve]
 DNS=127.0.0.1
-DNSStubListenerExtra=0.0.0.0:5353
+DNSStubListener=no
 ```
 
 Then restart:
@@ -194,12 +200,10 @@ Then restart:
 sudo systemctl restart systemd-resolved
 ```
 
-Or, to redirect the standard port 53 without running as root, see [Running on port 53](#running-on-port-53).
-
 ### Linux (NetworkManager)
 
 ```sh
-# Set DNS for the active connection (replace "Wired connection 1" with yours)
+# Replace "Wired connection 1" with your connection name (nmcli con show)
 nmcli con mod "Wired connection 1" ipv4.dns "127.0.0.1"
 nmcli con mod "Wired connection 1" ipv4.ignore-auto-dns yes
 nmcli con up "Wired connection 1"
@@ -211,15 +215,11 @@ nmcli con up "Wired connection 1"
 
 Add `127.0.0.1` and remove existing entries. Apply.
 
-Or via the command line (replace `Wi-Fi` with your interface):
+Or via the command line (replace `Wi-Fi` with your interface name):
 
 ```sh
 sudo networksetup -setdnsservers Wi-Fi 127.0.0.1
-```
-
-To restore:
-
-```sh
+# Restore with:
 sudo networksetup -setdnsservers Wi-Fi "Empty"
 ```
 
@@ -239,16 +239,13 @@ Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses ("127.0.0
 
 ## Running on port 53
 
-Port 53 is the standard DNS port. Binding to ports below 1024 typically requires elevated privileges.
+Port 53 is the standard DNS port. Binding below 1024 requires elevated privileges on most systems.
 
 ### Linux — grant capability without running as root
 
 ```sh
-# Grant the binary permission to bind privileged ports
 sudo setcap cap_net_bind_service=+ep ~/.cargo/bin/doh-proxy
-
-# Then start normally on port 53
-doh-proxy start --listen 0.0.0.0:53
+doh-proxy start --listen 127.0.0.1:53
 ```
 
 ### Linux — systemd service (recommended for always-on use)
@@ -320,12 +317,10 @@ launchctl load ~/Library/LaunchAgents/com.doh-proxy.plist
 
 ## Logging
 
-Logs are written to the runtime directory (see above) and to stdout when running interactively. View them with:
-
 ```sh
-doh-proxy logs          # last 20 lines + follow
-doh-proxy logs -n 100   # last 100 lines + follow
-doh-proxy logs --no-follow   # last 20 lines, then exit
+doh-proxy logs            # last 20 lines + follow
+doh-proxy logs -n 100     # last 100 lines + follow
+doh-proxy logs --no-follow  # last 20 lines, then exit
 ```
 
 Log lines are coloured by level — errors in red, warnings in yellow, debug output dimmed.
