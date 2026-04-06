@@ -38,10 +38,7 @@ async fn frontend_handler(uri: Uri) -> Response {
             match Frontend::get("index.html") {
                 Some(content) => (
                     StatusCode::OK,
-                    [(
-                        header::CONTENT_TYPE,
-                        "text/html; charset=utf-8".to_string(),
-                    )],
+                    [(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())],
                     content.data,
                 )
                     .into_response(),
@@ -55,14 +52,12 @@ async fn frontend_handler(uri: Uri) -> Response {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
     let log_file = env::var("LOG_FILE").unwrap_or_else(|_| "./proxy.log".to_string());
-    let db_url =
-        env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://dashboard.db".to_string());
+    let db_url = env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://dashboard.db".to_string());
 
     tracing::info!(log_file = %log_file, db = %db_url, "starting dns-dashboard");
 
@@ -84,9 +79,7 @@ async fn main() -> Result<()> {
         .allow_headers(tower_http::cors::Any);
 
     // API routes + static frontend fallback
-    let app = api::router(pool)
-        .fallback(frontend_handler)
-        .layer(cors);
+    let app = api::router(pool).fallback(frontend_handler).layer(cors);
 
     let addr: SocketAddr = env::var("LISTEN_ADDR")
         .unwrap_or_else(|_| "127.0.0.1:4000".to_string())

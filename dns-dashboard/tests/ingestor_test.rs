@@ -2,7 +2,8 @@ use dns_dashboard::ingestor::parse_line;
 
 #[test]
 fn parses_full_line() {
-    let line = "2026-04-06T12:00:00Z example.com A latency=42ms resolver=https://dns.example/dns-query";
+    let line =
+        "2026-04-06T12:00:00Z example.com A latency=42ms resolver=https://dns.example/dns-query";
     let q = parse_line(line).expect("should parse");
     assert_eq!(q.timestamp, "2026-04-06T12:00:00Z");
     assert_eq!(q.domain, "example.com");

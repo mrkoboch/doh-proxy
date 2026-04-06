@@ -27,10 +27,7 @@ struct LimitParam {
     limit: Option<i64>,
 }
 
-async fn recent_queries(
-    State(pool): State<Pool>,
-    Query(params): Query<LimitParam>,
-) -> Response {
+async fn recent_queries(State(pool): State<Pool>, Query(params): Query<LimitParam>) -> Response {
     let limit = params.limit.unwrap_or(50);
     match db::get_recent_queries(&pool, limit).await {
         Ok(rows) => Json(rows).into_response(),
@@ -41,10 +38,7 @@ async fn recent_queries(
     }
 }
 
-async fn top_domains(
-    State(pool): State<Pool>,
-    Query(params): Query<LimitParam>,
-) -> Response {
+async fn top_domains(State(pool): State<Pool>, Query(params): Query<LimitParam>) -> Response {
     let limit = params.limit.unwrap_or(10);
     match db::get_top_domains(&pool, limit).await {
         Ok(rows) => Json(rows).into_response(),
