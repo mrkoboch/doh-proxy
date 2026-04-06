@@ -67,8 +67,8 @@ export default function TopDomains({ domains }) {
                 cursor={{ fill: 'rgba(79,158,255,0.08)' }}
               />
               <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                {domains.map((_, i) => (
-                  <Cell key={i} fill="#4f9eff" />
+                {domains.map((entry) => (
+                  <Cell key={entry.domain} fill="#4f9eff" />
                 ))}
               </Bar>
             </BarChart>

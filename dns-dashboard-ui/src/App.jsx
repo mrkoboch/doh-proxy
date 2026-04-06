@@ -13,22 +13,22 @@ export default function App() {
   const [domains, setDomains] = useState([])
   const [queries, setQueries] = useState([])
 
-  async function refresh() {
-    try {
-      const [s, d, q] = await Promise.all([
-        fetchStats(),
-        fetchTopDomains(),
-        fetchRecentQueries(),
-      ])
-      setStats(s)
-      setDomains(d)
-      setQueries(q)
-    } catch (err) {
-      console.error('Failed to refresh dashboard data:', err)
-    }
-  }
-
   useEffect(() => {
+    async function refresh() {
+      try {
+        const [s, d, q] = await Promise.all([
+          fetchStats(),
+          fetchTopDomains(),
+          fetchRecentQueries(),
+        ])
+        setStats(s)
+        setDomains(d)
+        setQueries(q)
+      } catch (err) {
+        console.error('Failed to refresh dashboard data:', err)
+      }
+    }
+
     refresh()
     const id = setInterval(refresh, 5000)
     return () => clearInterval(id)
