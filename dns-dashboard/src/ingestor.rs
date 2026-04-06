@@ -81,6 +81,13 @@ async fn try_tail_log(pool: Arc<SqlitePool>, log_path: &Path) -> anyhow::Result<
         line.clear();
         let n = reader.read_line(&mut line).await?;
         if n == 0 {
+            // Check for file rotation: if current file is smaller than our position, re-open
+            if let Ok(meta) = tokio::fs::metadata(log_path).await {
+                if meta.len() < reader.stream_position().await.unwrap_or(0) {
+                    tracing::info!(path = ?log_path, "log file rotated, re-opening");
+                    return Ok(());
+                }
+            }
             // No new data — poll again shortly
             sleep(Duration::from_millis(200)).await;
             continue;
