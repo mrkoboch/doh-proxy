@@ -10,8 +10,6 @@ fn main() {
 
     let (npm, node_bin_dir) = find_npm();
 
-    println!("cargo:warning=Running npm run build (in dns-dashboard-ui/)");
-
     // Build PATH that includes the node bin dir so `node` is resolvable
     let path = match node_bin_dir {
         Some(ref dir) => {
@@ -20,6 +18,21 @@ fn main() {
         }
         None => std::env::var("PATH").unwrap_or_default(),
     };
+
+    println!("cargo:warning=Running npm install (in dns-dashboard-ui/)");
+
+    let install_status = Command::new(&npm)
+        .args(["install"])
+        .current_dir("../dns-dashboard-ui")
+        .env("PATH", &path)
+        .status()
+        .unwrap_or_else(|e| panic!("Failed to run npm install ({npm}): {e}"));
+
+    if !install_status.success() {
+        panic!("npm install failed — check dns-dashboard-ui/ for errors");
+    }
+
+    println!("cargo:warning=Running npm run build (in dns-dashboard-ui/)");
 
     let status = Command::new(&npm)
         .args(["run", "build"])
