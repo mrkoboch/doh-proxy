@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use console::style;
 
-use doh_proxy::runtime;
+use doh_rs::runtime;
 
 pub fn run(follow: bool, lines: usize) -> anyhow::Result<()> {
     let log_path = runtime::log_path();

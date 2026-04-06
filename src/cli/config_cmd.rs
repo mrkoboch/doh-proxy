@@ -1,7 +1,7 @@
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input};
 
-use doh_proxy::config::{config_path, CacheConfig, Config};
+use doh_rs::config::{config_path, CacheConfig, Config};
 
 pub fn run() -> anyhow::Result<()> {
     let theme = ColorfulTheme::default();

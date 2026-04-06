@@ -6,7 +6,7 @@ use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use tracing::info;
 
-use doh_proxy::{
+use doh_rs::{
     config::Config,
     runtime::{self, RuntimeStats},
     server::Server,

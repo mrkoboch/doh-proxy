@@ -1,4 +1,4 @@
-use doh_proxy::config::Config;
+use doh_rs::config::Config;
 
 #[test]
 fn config_defaults_parse() {

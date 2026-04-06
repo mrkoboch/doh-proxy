@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use console::style;
 
-use doh_proxy::{config::config_path, runtime};
+use doh_rs::{config::config_path, runtime};
 
 pub fn run() -> anyhow::Result<()> {
     let pid = runtime::read_pid()?;

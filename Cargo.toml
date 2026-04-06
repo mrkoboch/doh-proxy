@@ -1,16 +1,16 @@
 [package]
-name = "doh-proxy"
+name = "doh-rs"
 version = "0.1.0"
 edition = "2021"
 description = "A DNS-over-HTTPS proxy with a polished terminal interface"
 license = "MIT"
-repository = "https://github.com/your-username/doh-proxy"
+repository = "https://github.com/mrkoboch/doh-proxy"
 keywords = ["dns", "proxy", "doh", "cli", "terminal"]
 categories = ["command-line-utilities", "network-programming"]
 readme = "README.md"
 
 [lib]
-name = "doh_proxy"
+name = "doh_rs"
 path = "src/lib.rs"
 
 [[bin]]

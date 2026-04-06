@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use console::style;
 
-use doh_proxy::runtime;
+use doh_rs::runtime;
 
 pub fn run() -> anyhow::Result<()> {
     let pid = match runtime::read_pid()? {
